@@ -45,7 +45,29 @@ class Node:
 
 class MCTS:
     """Handles the MCTS logic (Selection, Expansion, Simulation, Backpropagation)"""
-    pass
+    
+    def __init__(self, root: Node):
+        pass
+
+    def selection(self, ):
+        pass
+
+    def expansion(self, ):
+        pass
+
+    def simulation(self, ):
+        pass
+
+    def backpropagation(self, ):
+        pass
+
+    def run(self, num_iterations: int):
+        for _ in range(num_iterations):
+            # select node to explore and expand it
+            # simulate game play till game over
+            # do backpropagation
+
+
 
 
 

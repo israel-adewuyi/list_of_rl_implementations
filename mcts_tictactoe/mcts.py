@@ -5,7 +5,7 @@ from utils import generate_random_board
 class Board:
     """This class manages game states, check for wins / draws and generates legal moves"""
 
-    def __init__(self, board: List[Optional[int]], current_player: str = "X") -> None:
+    def __init__(self, board: List[Optional[str]], current_player: str = "X") -> None:
         self.board = board if board is not None else [" " for _ in range(9)] 
         self.current_player = current_player
 
@@ -18,7 +18,7 @@ class Board:
         for idx in range(3):
             flag |= self._check_col_win(idx, player)
         flag |= self._check_diag_win(player)
-
+        print(flag)
         return flag
 
     def _check_row_win(self, idx: int, player: str) -> bool:
@@ -37,7 +37,7 @@ class Board:
         Returns:
             bool: _description_
         """
-        if self.is_winning_state() or not self.get_legal_moves():
+        if self.is_winning_state() or self.get_legal_moves() is not None:
             return True
         return False
 
@@ -56,9 +56,9 @@ class Board:
             legal_moves: list of legal moves
         """
         legal_moves = []
-        for position in self.board:
-            if position is None:
-                legal_moves.append(position)
+        for idx, position in enumerate(self.board):
+            if position == " ":
+                legal_moves.append(idx)
         
         return legal_moves
     
@@ -104,8 +104,9 @@ class MCTS:
 
 
 if __name__ == "__main__":
-    board = generate_random_board(seed=2)
+    board = generate_random_board(include_space=True, seed=2)
+    # board = ['X', '', 'O', 'X', 'O', 'O', 'O', '', 'O']
     print("Random board generated: ", board)
-    init_board = Board(board=board)
+    init_board = Board(board=board, current_player="O")
     print(init_board.__repr__())
     print(init_board.is_winning_state())

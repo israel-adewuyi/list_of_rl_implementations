@@ -69,8 +69,16 @@ class Board:
 class Node:
     """Represents each state in the MCTS tree, tracking visits, rewards, and untried moves."""
     
-    def __init__(self, _, board_state) -> None:
+    def __init__(self, board_state: Board, _=None, parents: Board=None) -> None:
         self.state = board_state
+        self.parents = parents
+        self.children = []
+        self.untried_moves = self.state.get_legal_moves()
+        self.visits = 0
+        self.wins = 0
+        
+    def make_move(self, ):
+        return self.untried_moves
 
 class MCTS:
     """Handles the MCTS logic (Selection, Expansion, Simulation, Backpropagation)"""
@@ -104,9 +112,13 @@ class MCTS:
 
 
 if __name__ == "__main__":
-    board = generate_random_board(include_space=True, seed=2)
+    board = generate_random_board(include_space=False, seed=2)
     # board = ['X', '', 'O', 'X', 'O', 'O', 'O', '', 'O']
     print("Random board generated: ", board)
     init_board = Board(board=board, current_player="O")
     print(init_board.__repr__())
     print(init_board.is_winning_state())
+    
+    
+    temp_node = Node(board_state=init_board)
+    print(temp_node.make_move())

@@ -1,16 +1,18 @@
 from typing import List, Optional
+from utils import generate_random_board
+
 
 class Board:
     """This class manages game states, check for wins / draws and generates legal moves"""
 
     def __init__(self, board: List[Optional[int]], current_player: str = "X") -> None:
-        self.board = board if board is not None else [0 for _ in range(9)] # TODO: Might revisit this.
+        self.board = board if board is not None else [" " for _ in range(9)] 
         self.current_player = current_player
 
     def is_winning_state(self, player: str = None) -> bool:
         player = player if player else self.current_player
 
-        flag = True
+        flag = False
         for idx in range(0, 9, 3):
             flag |= self._check_row_win(idx, player)
         for idx in range(3):
@@ -29,49 +31,81 @@ class Board:
         return (self.board[0] == self.board[4] == self.board[8] == player) or \
                 (self.board[2] == self.board[4] == self.board[6] == player)
 
-    def is_game_over(self, ):
-        pass
+    def is_game_over(self, ) -> bool:
+        """Checks if the game is over, with the current board state
+
+        Returns:
+            bool: _description_
+        """
+        if self.is_winning_state() or not self.get_legal_moves():
+            return True
+        return False
 
     def make_move(self, player):
+        """Makes a move by placing the player's str. 
+
+        Args:
+            player (_type_): _description_
+        """
         pass
 
-    def get_legal_moves(self, ):
-        pass
+    def get_legal_moves(self, ) -> List[str]:
+        """Gets a list of position on the current board that is unoccupied i.e value at this position is None
+
+        Returns:
+            legal_moves: list of legal moves
+        """
+        legal_moves = []
+        for position in self.board:
+            if position is None:
+                legal_moves.append(position)
+        
+        return legal_moves
+    
+    def __repr__(self) -> str:
+        return f"{self.board[0 : 3]} \n{self.board[3 : 6]} \n{self.board[6 : 9]}"
         
 
 class Node:
     """Represents each state in the MCTS tree, tracking visits, rewards, and untried moves."""
-
+    
+    def __init__(self, _, board_state) -> None:
+        self.state = board_state
 
 class MCTS:
     """Handles the MCTS logic (Selection, Expansion, Simulation, Backpropagation)"""
     
     def __init__(self, root: Node):
+        # this should be of type node
         pass
 
-    def selection(self, ):
+    def selection(self, node: Node):
+        # Should do ucb eval for the node passed to it.
         pass
 
     def expansion(self, ):
+        # add a random node to the current node
         pass
 
     def simulation(self, ):
+        # while(True):
+            # simulate game till end
         pass
 
     def backpropagation(self, ):
         pass
 
     def run(self, num_iterations: int):
-        for _ in range(num_iterations):
+        pass
+        # for _ in range(num_iterations):
             # select node to explore and expand it
             # simulate game play till game over
-            # do backpropagation
-
-
-
-
-
+            # do backpropagation``
 
 
 if __name__ == "__main__":
-    init_board = Board()
+    board = generate_random_board(seed=2)
+    print("Random board generated: ", board)
+    init_board = Board(board=board)
+    print(init_board.__repr__())
+    print(init_board.is_winning_state())

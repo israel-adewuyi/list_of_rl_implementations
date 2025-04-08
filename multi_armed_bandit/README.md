@@ -11,7 +11,7 @@ Implementation of the Multi-arm bandit from Chapter 2 of the [Sutton book](https
 - `main.py` and `utils.py` - code to run the agents, collect reward stats, plot culmulative rewards and write plots to file.
 
 ### Culmulative rewards
-![rewards](/assets/agent_rewards.png)
+![rewards](assets/agent_rewards.png)
 
 ### To run
 `python main.py`

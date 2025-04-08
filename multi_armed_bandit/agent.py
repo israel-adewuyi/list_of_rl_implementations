@@ -59,6 +59,9 @@ class EpsilonGreedyAgent(Agent):
         self.Q = np.full((self.num_arms, ), self.initial_value, dtype=float)
         self.N = np.zeros((self.num_arms))
 
+    def __repr__(self, ):
+        return f"EpsilonGreedyAgent_eps={self.epsilon}_initial_value={self.initial_value})"
+
 
 
 if __name__ == "__main__":

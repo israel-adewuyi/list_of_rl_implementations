@@ -63,7 +63,32 @@ class EpsilonGreedyAgent(Agent):
         return f"EpsilonGreedyAgent_eps={self.epsilon}_initial_value={self.initial_value})"
 
 
+class UCBAgent(Agent):
+    """Agent that chooses actions according to the Upper Confidence Bound action selection method
+    \(A_t = \text{argmax}_a[Q(a) + c \sqrt{\frac{ln t}{N(a)}}] \)
+    """
+    def __init__(self, num_arms: int, seed: int, c: float) -> None:
+        self.c = c
+        super().__init__(num_arms, seed)
+        
+    def get_action(self, ) -> ActType:
+        action = int(np.argmax(self.Q + self.c * np.sqrt(np.log2(self.t) / (self.N + 1e-8))))
+        return action
+    
+    def observe(self, action: ActType, reward: float, info: dict) -> None:
+        self.t += 1
+        self.N[action] += 1
+        self.Q[action] += (reward - self.Q[action]) / self.N[action]
+        
+    def reset(self, seed: Optional[int] = None) -> None:
+        super().reset(seed)
+        self.t = 1
+        self.Q = np.zeros((self.num_arms))
+        self.N = np.zeros((self.num_arms))
 
+    def __repr__(self, ) -> None:
+        return f"UCBAgent_c={self.c}"
+    
 if __name__ == "__main__":
     agent = RandomAgent(10, 42)
     agent2 = EpsilonGreedyAgent(10, 0, 0.1, 4)

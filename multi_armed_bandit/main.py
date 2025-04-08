@@ -4,7 +4,7 @@ import gymnasium as gym
 from tqdm import tqdm
 from utils import plot_rewards
 from multi_armed_bandit_env import MultiArmedBandit
-from agent import Agent, RandomAgent, EpsilonGreedyAgent
+from agent import Agent, RandomAgent, EpsilonGreedyAgent, UCBAgent
 
 def run_episode(env: gym.Env, agent: Agent, seed: int):
     '''
@@ -79,14 +79,20 @@ if __name__ == "__main__":
     
     # print(f"Expected average reward: 0.0, actual: {rewards.mean():.6f}")
     # assert np.isclose(rewards.mean(), 0, atol=0.05), "Random agent should be getting mean arm reward, which is zero."
-    for epsilon in [0.1, 0.01]:
-        for initial_value in [0, 5]:
-            agent = EpsilonGreedyAgent(num_arms, 0, epsilon, initial_value)
-            rewards, corrects = run_agent(env, agent)
-            all_rewards.append(rewards)
-            names.append(str(agent))
-            print(agent)
-            print(f" -> Frequency of correct arm: {corrects.mean():.4f}")
-            print(f" -> Average reward: {rewards.mean():.4f}")
+    epsilon = 0.1
+    for initial_value in [0, 5]:
+        agent = EpsilonGreedyAgent(num_arms, 0, epsilon, initial_value)
+        rewards, corrects = run_agent(env, agent)
+        all_rewards.append(rewards)
+        names.append(str(agent))
+        print(agent)
+        print(f" -> Frequency of correct arm: {corrects.mean():.4f}")
+        print(f" -> Average reward: {rewards.mean():.4f}")
 
+    # Upper Confidence Bound Selection Agent
+    UCBAgent = UCBAgent(num_arms, 0, 2)
+    UCB_rewards, UCB_corrects = run_agent(env, UCBAgent)
+    all_rewards.append(UCB_rewards)
+    names.append(str(UCBAgent))
+    
     plot_rewards(all_rewards, names, "assets/agent_rewards.png")

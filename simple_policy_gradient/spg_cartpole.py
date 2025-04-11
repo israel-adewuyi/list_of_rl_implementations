@@ -17,16 +17,17 @@ from torch.distributions import Categorical
 class SPGArgs:
     """Dataclass for the necessary parameters"""
 
+    seed: int = 0
     env_name: str = "CartPole-v1"
     hidden_size: Int = 32
-    num_epochs: Int = 200
+    num_epochs: Int = 2000
     project_name: str = "policy_gradients"
     apply_discount: Bool = False
     gamma: Float = 0.99
-    lr: Float = 0.004
+    lr: Float = 0.002
 
     def __post_init__(self):
-        self.run_name = f"spg_{self.env_name}_lr={self.lr}_num_epochs={self.num_epochs}_time={time.strftime('%Y-%m-%d %H:%M:%S')}"
+        self.run_name = f"spg_{self.env_name}_lr={self.lr}_num_epochs={self.num_epochs}_seed={self.seed}_time={time.strftime('%Y-%m-%d %H:%M:%S')}"
 
 def get_policy_network(hidden_state: int):
     return nn.Sequential(
@@ -37,7 +38,11 @@ def get_policy_network(hidden_state: int):
 
 class SimplePolicyGradient:
     def __init__(self, config: SPGArgs) -> None:
+        torch.manual_seed(config.seed)
+        np.random.seed(config.seed)
         self.env = gym.make(config.env_name)
+        self.env.reset(seed=config.seed)
+        self.config = config
         self.epochs = config.num_epochs
         self.policy = get_policy_network(hidden_state=config.hidden_size)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=config.lr)
@@ -106,14 +111,9 @@ class SimplePolicyGradient:
     def train_one_epoch_step(self, ) -> Tuple[List[Tensor], List[Int], List[Float], List[Tensor]]:
         """Function to take rollout in the environment. 
         """
-        batch_obs = []
-        batch_act = []
-        batch_rew = []
-        batch_log_probs = []
-
-        obs, _ = self.env.reset()
+        batch_obs, batch_act, batch_rew, batch_log_probs = [], [], [], []
+        obs, _ = self.env.reset(seed=self.config.seed)
         obs = torch.Tensor(obs)
-
         done = False
 
         while not done:

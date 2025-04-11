@@ -5,6 +5,7 @@ import numpy as np
 import torch.nn as nn
 import gymnasium as gym
 
+from tqdm import tqdm
 from torch import Tensor
 from typing import Tuple, List
 from jaxtyping import Float, Int, Bool
@@ -59,7 +60,7 @@ class SimplePolicyGradient:
 
     def train_agent(self, ):
         """Function to train the agent"""
-        for step in range(self.epochs):
+        for step in tqdm(range(self.epochs)):
             _, _, rewards, log_probs = self.train_one_epoch_step()
 
             loss = self.compute_loss(rewards, log_probs)

@@ -19,12 +19,12 @@ class SPGArgs:
 
     seed: int = 0
     env_name: str = "CartPole-v1"
-    hidden_size: Int = 32
+    hidden_size: Int = 64
     num_epochs: Int = 2000
     project_name: str = "policy_gradients"
-    apply_discount: Bool = False
+    apply_discount: Bool = True
     gamma: Float = 0.99
-    lr: Float = 0.002
+    lr: Float = 0.001
 
     def __post_init__(self):
         self.run_name = f"spg_{self.env_name}_lr={self.lr}_num_epochs={self.num_epochs}_seed={self.seed}_time={time.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -43,6 +43,7 @@ class SimplePolicyGradient:
         self.env = gym.make(config.env_name)
         self.env.reset(seed=config.seed)
         self.config = config
+        self.gamma = 1.0 if config.apply_discount else config.gamma
         self.epochs = config.num_epochs
         self.policy = get_policy_network(hidden_state=config.hidden_size)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=config.lr)
@@ -69,7 +70,7 @@ class SimplePolicyGradient:
             _, _, rewards, log_probs = self.train_one_epoch_step()
 
             loss = self.compute_loss(rewards, log_probs)
-
+            grad_norm = sum(p.grad.norm().item() for p in self.policy.parameters() if p.grad is not None)
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -78,7 +79,9 @@ class SimplePolicyGradient:
                 {
                     "loss": loss.item(),
                     "rewards_sum": sum(rewards),
-                    "rewards_mean": np.array(rewards, dtype=np.float32).mean()
+                    "rewards_mean": np.array(rewards, dtype=np.float32).mean(),
+                    "episode_length": len(rewards), 
+                    "grad_norm": grad_norm
                 }, step
             )
 
@@ -99,7 +102,7 @@ class SimplePolicyGradient:
         R = 0
 
         for r in reversed(rewards):
-            R = r + R
+            R = r + self.gamma * R
             returns.insert(0, R) 
 
         returns = torch.Tensor(returns)

@@ -23,7 +23,7 @@ class SimplePolicyGradient:
         self.policy = get_policy_network(hidden_state=hidden_size)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=0.004)
 
-    def get_action(self, logits: Float[Tensor, "... 2"]) -> Int:
+    def get_action(self, logits: Float[Tensor, "2"]) -> Int:
         """Function to sample action from the logits output of the policy network
 
         Args:
@@ -39,6 +39,7 @@ class SimplePolicyGradient:
         return torch.log_softmax(logits, dim=-1)[action]
 
     def train_agent(self, ):
+        """Function to train the agent"""
         for _ in range(self.epochs):
             _, _, rewards, log_probs = self.train_one_epoch_step()
             loss = self.compute_loss(rewards, log_probs)
@@ -46,6 +47,8 @@ class SimplePolicyGradient:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+
+            print(sum(rewards))
 
 
     def compute_loss(self, rewards: List[float], log_probs: List[Tensor]) -> Float:
@@ -60,16 +63,21 @@ class SimplePolicyGradient:
         Returns:
             Float: loss
         """
-        trajectory_rewards = sum(rewards)
-        loss = -sum(trajectory_rewards * log_prob for log_prob in log_probs)
+        returns = []
+        R = 0
+
+        for r in reversed(rewards):
+            R = r + R
+            returns.insert(0, R) 
+
+        returns = torch.Tensor(returns)
         
-        return loss    
+        loss = -(torch.stack(log_probs) * returns).mean()
+
+        return loss
 
     def train_one_epoch_step(self, ) -> Tuple[List[Tensor], List[Float], List[Int], List[Tensor]]:
         """Function to take rollout in the environment. 
-
-        Returns:
-            _type_: _description_
         """
         batch_obs = []
         batch_act = []
@@ -90,12 +98,10 @@ class SimplePolicyGradient:
 
             done = terminated or truncated
 
-            batch_obs.append(obs.detach().clone())
+            batch_obs.append(obs)
             batch_act.append(act)
             batch_rew.append(reward)
-            batch_log_probs.append(log_probs.detach().clone())
-            
-            # print(type(obs), type(reward), type(act), type(log_probs))
+            batch_log_probs.append(log_probs)
 
             obs = torch.Tensor(next_obs)
         
@@ -106,5 +112,5 @@ if __name__ == "__main__":
     policy_net = get_policy_network(32)
     print(policy_net)
 
-    spg = SimplePolicyGradient(32, 2)
+    spg = SimplePolicyGradient(32, 20)
     spg.train_agent()

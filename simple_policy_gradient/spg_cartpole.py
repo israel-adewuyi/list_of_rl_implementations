@@ -21,6 +21,7 @@ class SimplePolicyGradient:
         self.env = gym.make("CartPole-v1")
         self.epochs = epochs
         self.policy = get_policy_network(hidden_state=hidden_size)
+        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=0.004)
 
     def get_action(self, logits: Float[Tensor, "... 2"]) -> Int:
         """Function to sample action from the logits output of the policy network
@@ -39,9 +40,30 @@ class SimplePolicyGradient:
 
     def train_agent(self, ):
         for _ in range(self.epochs):
-            obs, act, rewards, log_probs = self.train_one_epoch_step()
-            print(sum(rewards))
-            
+            _, _, rewards, log_probs = self.train_one_epoch_step()
+            loss = self.compute_loss(rewards, log_probs)
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+
+    def compute_loss(self, rewards: List[float], log_probs: List[Tensor]) -> Float:
+        """Computes the loss term for a trajectory.
+        
+        See: https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html#deriving-the-simplest-policy-gradient
+
+        Args:
+            rewards (List[float]): all the rewards received on the particular trajectory
+            log_probs (List[Tensor]): the log_prob of the correct action taken at the t-th timestep
+
+        Returns:
+            Float: loss
+        """
+        trajectory_rewards = sum(rewards)
+        loss = -sum(trajectory_rewards * log_prob for log_prob in log_probs)
+        
+        return loss    
 
     def train_one_epoch_step(self, ) -> Tuple[List[Tensor], List[Float], List[Int], List[Tensor]]:
         """Function to take rollout in the environment. 

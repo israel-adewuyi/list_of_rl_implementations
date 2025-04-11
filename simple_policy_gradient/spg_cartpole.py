@@ -1,4 +1,5 @@
 import time
+import wandb
 import torch
 import numpy as np
 import torch.nn as nn
@@ -17,7 +18,7 @@ class SPGArgs:
 
     env_name: str = "CartPole-v1"
     hidden_size: Int = 32
-    num_epochs: Int = 2
+    num_epochs: Int = 200
     project_name: str = "policy_gradients"
     apply_discount: Bool = False
     gamma: Float = 0.99
@@ -39,8 +40,7 @@ class SimplePolicyGradient:
         self.epochs = config.num_epochs
         self.policy = get_policy_network(hidden_state=config.hidden_size)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=config.lr)
-        
-        print(config.run_name)
+        wandb.init(project=config.project_name, name=config.run_name)
 
     def get_action(self, logits: Float[Tensor, "2"]) -> Int:
         """Function to sample action from the logits output of the policy network
@@ -59,15 +59,22 @@ class SimplePolicyGradient:
 
     def train_agent(self, ):
         """Function to train the agent"""
-        for _ in range(self.epochs):
+        for step in range(self.epochs):
             _, _, rewards, log_probs = self.train_one_epoch_step()
+
             loss = self.compute_loss(rewards, log_probs)
 
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
-            print(sum(rewards))
+            wandb.log(
+                {
+                    "loss": loss.item(),
+                    "rewards_sum": sum(rewards),
+                    "rewards_mean": np.array(rewards, dtype=np.float32).mean()
+                }, step
+            )
 
 
     def compute_loss(self, rewards: List[float], log_probs: List[Tensor]) -> Float:
@@ -95,7 +102,7 @@ class SimplePolicyGradient:
 
         return loss
 
-    def train_one_epoch_step(self, ) -> Tuple[List[Tensor], List[Float], List[Int], List[Tensor]]:
+    def train_one_epoch_step(self, ) -> Tuple[List[Tensor], List[Int], List[Float], List[Tensor]]:
         """Function to take rollout in the environment. 
         """
         batch_obs = []
@@ -128,9 +135,6 @@ class SimplePolicyGradient:
 
   
 if __name__ == "__main__":
-    policy_net = get_policy_network(32)
-    print(policy_net)
-
     args = SPGArgs()
 
     spg = SimplePolicyGradient(args)

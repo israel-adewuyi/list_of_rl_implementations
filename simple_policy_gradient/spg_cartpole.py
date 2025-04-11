@@ -1,3 +1,4 @@
+import time
 import torch
 import numpy as np
 import torch.nn as nn
@@ -5,9 +6,25 @@ import gymnasium as gym
 
 from torch import Tensor
 from typing import Tuple, List
-from jaxtyping import Float, Int
+from jaxtyping import Float, Int, Bool
+from dataclasses import dataclass
 from torch.distributions import Categorical
 
+
+@dataclass
+class SPGArgs:
+    """Dataclass for the necessary parameters"""
+
+    env_name: str = "CartPole-v1"
+    hidden_size: Int = 32
+    num_epochs: Int = 2
+    project_name: str = "policy_gradients"
+    apply_discount: Bool = False
+    gamma: Float = 0.99
+    lr: Float = 0.004
+
+    def __post_init__(self):
+        self.run_name = f"spg_{self.env_name}_lr={self.lr}_num_epochs={self.num_epochs}_time={time.strftime('%Y-%m-%d %H:%M:%S')}"
 
 def get_policy_network(hidden_state: int):
     return nn.Sequential(
@@ -17,11 +34,13 @@ def get_policy_network(hidden_state: int):
     )
 
 class SimplePolicyGradient:
-    def __init__(self, hidden_size: int, epochs: int) -> None:
-        self.env = gym.make("CartPole-v1")
-        self.epochs = epochs
-        self.policy = get_policy_network(hidden_state=hidden_size)
-        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=0.004)
+    def __init__(self, config: SPGArgs) -> None:
+        self.env = gym.make(config.env_name)
+        self.epochs = config.num_epochs
+        self.policy = get_policy_network(hidden_state=config.hidden_size)
+        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=config.lr)
+        
+        print(config.run_name)
 
     def get_action(self, logits: Float[Tensor, "2"]) -> Int:
         """Function to sample action from the logits output of the policy network
@@ -112,5 +131,7 @@ if __name__ == "__main__":
     policy_net = get_policy_network(32)
     print(policy_net)
 
-    spg = SimplePolicyGradient(32, 20)
+    args = SPGArgs()
+
+    spg = SimplePolicyGradient(args)
     spg.train_agent()

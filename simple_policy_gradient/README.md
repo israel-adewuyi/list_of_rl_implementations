@@ -7,12 +7,14 @@ Implementation of the Vanilla Policy Gradients (a.k.a REINFORCE) from the [Spinn
 
 ### Notes
 From the [reference document](https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html), 
+
 $$\hat{g} = -\frac{1}{|\mathcal{D}|} \sum_{\tau \in \mathcal{D}} \sum_{t=0}^{T} \nabla_{\theta} \log \pi_{\theta}(a_t |s_t) R(\tau)$$
 
 
 The implementation in this repo is
 
 $$ \hat{g} = \nabla_\theta \mathcal{L}(\theta) = -\frac{1}{N}\sum_{i=1}^N \nabla_\theta \log \pi_\theta(a_i|s_i) \tilde{G}_i $$
+
 where $ G_i = \sum_{k=i}^{T_{ep}} \gamma^{k-i} r_k $ (discounted rewards ) and $ \tilde{G}_i $ is normalized discounted rewards.
 ### Repository structure
 - `spg_cartpole.py` implements the code to run the vanilla policy gradient agent on Cartpole.

@@ -53,7 +53,7 @@ class SimplePolicyGradient:
         """Function to sample action from the logits output of the policy network
 
         Args:
-            logits (Float[Tensor, ... 2]): output of the policy network
+            logits (Float[Tensor, 2]): output of the policy network
 
         Returns:
             Int: sampled action

@@ -24,7 +24,7 @@ class SPGArgs:
     seed: Int = 0
     env_name: str = "CartPole-v1"
     hidden_size: Int = 64
-    num_epochs: Int = 100
+    num_epochs: Int = 500
     project_name: str = "policy_gradients"
     apply_discount: Bool = True
     gamma: Float = 0.99

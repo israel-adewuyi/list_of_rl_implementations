@@ -7,10 +7,12 @@ import gymnasium as gym
 
 from tqdm import tqdm
 from torch import Tensor
-from typing import Tuple, List
-from jaxtyping import Float, Int, Bool
-from dataclasses import dataclass
+from pathlib import Path
 from dotenv import load_dotenv
+from typing import Tuple, List
+from dataclasses import dataclass
+from jaxtyping import Float, Int, Bool
+from gymnasium.wrappers import RecordVideo
 from torch.distributions import Categorical
 
 load_dotenv()
@@ -22,18 +24,22 @@ class SPGArgs:
     seed: Int = 0
     env_name: str = "CartPole-v1"
     hidden_size: Int = 64
-    num_epochs: Int = 50
+    num_epochs: Int = 100
     project_name: str = "policy_gradients"
     apply_discount: Bool = True
     gamma: Float = 0.99
     lr: Float = 0.002
     batch_size: Int = 5000
     device: str = "cuda:3"
+    video_interval: Int = 10  
+    video_length: Int = 500
 
     def __post_init__(self):
         self.run_name = f"spg_{self.env_name}_batch_size={self.batch_size}_num_epochs={self.num_epochs}_seed={self.seed}_time={time.strftime('%Y-%m-%d %H:%M:%S')}"
 
 def get_policy_network(hidden_state: int):
+    """A simple MLP neural work which is meant to be the policy network.
+    """
     return nn.Sequential(
         nn.Linear(4, hidden_state),
         nn.Tanh(),
@@ -41,11 +47,39 @@ def get_policy_network(hidden_state: int):
     )
 
 class SimplePolicyGradient:
+    """Implementation for the vanilla policy gradient a.k.a REINFORCE. 
+
+        Args:
+            config (SPGArgs): Configuration dataclass containing hyperparameters
+            
+        Attributes:
+            env (gym.Env): Training environment
+            record_env (gym.Env): Environment for recording videos
+            config (SPGArgs): Configuration parameters
+            gamma (float): Discount factor
+            epochs (int): Number of training epochs
+            policy (nn.Sequential): Neural network policy
+            optimizer (torch.optim.Optimizer): Policy optimizer
+    """
     def __init__(self, config: SPGArgs) -> None:
         torch.manual_seed(config.seed)
         np.random.seed(config.seed)
+
+        # Temporary directory for videos
+        self.video_dir = Path("simple_policy_gradient/videos")
+        self.video_dir.mkdir(exist_ok=True)
+        
         self.env = gym.make(config.env_name)
         self.env.reset(seed=config.seed)
+        self.record_env = RecordVideo(
+            gym.make(config.env_name, render_mode="rgb_array"),
+            video_folder=self.video_dir,
+            episode_trigger=lambda x: True,
+            name_prefix="rl-video",
+            disable_logger=True
+        )
+        self.record_env.reset(seed=config.seed)
+
         self.config = config
         self.gamma = config.gamma if config.apply_discount else 1.0
         self.epochs = config.num_epochs
@@ -79,17 +113,42 @@ class SimplePolicyGradient:
             loss.backward()
             self.optimizer.step()
 
-            wandb.log(
-                {
-                    "loss": loss.item(),
-                    # "rewards_sum": sum(rewards),
-                    "rewards_avg_per_episode": np.array(undiscounted_batch_ret, dtype=np.float32).mean(),
-                    "episode_length": np.mean(batch_len), 
-                    "grad_norm": grad_norm
-                }, step
-            )
+            log_data = {
+                "loss": loss.item(),
+                "rewards_avg_per_episode": np.array(undiscounted_batch_ret, dtype=np.float32).mean(),
+                "episode_length": np.mean(batch_len), 
+                "grad_norm": grad_norm
+            }
+            
+            if step % self.config.video_interval == 0:
+                video_path = self.record_episode()
+                if video_path:
+                    log_data["video"] = wandb.Video(str(video_path), format="mp4")
+            
+            wandb.log(log_data, step)
 
 
+    def record_episode(self):
+        """Record a single episode and return the video path"""
+        obs, _ = self.record_env.reset()
+        frames = []
+        
+        for _ in range(self.config.video_length):
+            obs = torch.Tensor(obs).to(self.config.device)
+            logits = self.policy(obs)
+            act = self.get_action(logits)
+            obs, _, terminated, truncated, _ = self.record_env.step(act)
+            
+            if terminated or truncated:
+                break
+                
+        self.record_env.close()
+        
+        video_files = list(self.video_dir.glob("*.mp4"))
+        if video_files:
+            return sorted(video_files)[-1]
+        return None
+        
     def compute_loss(self, returns: List[float], log_probs: List[Tensor]) -> Float:
         """Computes the loss term for a trajectory.
         

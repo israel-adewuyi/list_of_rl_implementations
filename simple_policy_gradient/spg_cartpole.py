@@ -17,14 +17,15 @@ from torch.distributions import Categorical
 class SPGArgs:
     """Dataclass for the necessary parameters"""
 
-    seed: int = 0
+    seed: Int = 0
     env_name: str = "CartPole-v1"
     hidden_size: Int = 64
-    num_epochs: Int = 2000
+    num_epochs: Int = 20
     project_name: str = "policy_gradients"
     apply_discount: Bool = True
     gamma: Float = 0.99
-    lr: Float = 0.001
+    lr: Float = 0.002
+    batch_size: Int = 1000
 
     def __post_init__(self):
         self.run_name = f"spg_{self.env_name}_lr={self.lr}_num_epochs={self.num_epochs}_seed={self.seed}_time={time.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -65,7 +66,7 @@ class SimplePolicyGradient:
         return torch.log_softmax(logits, dim=-1)[action]
 
     def train_agent(self, ):
-        """Function to train the agent"""
+        """Function to train the agent + log necessary metrics"""
         for step in tqdm(range(self.epochs)):
             _, _, rewards, log_probs = self.train_one_epoch_step()
 
@@ -86,7 +87,7 @@ class SimplePolicyGradient:
             )
 
 
-    def compute_loss(self, rewards: List[float], log_probs: List[Tensor]) -> Float:
+    def compute_loss(self, returns: List[float], log_probs: List[Tensor]) -> Float:
         """Computes the loss term for a trajectory.
         
         See: https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html#deriving-the-simplest-policy-gradient
@@ -98,44 +99,62 @@ class SimplePolicyGradient:
         Returns:
             Float: loss
         """
+        returns = torch.Tensor(returns)
+        returns = ((returns - returns.mean()) / (returns.std() + 1e-8))
+        loss = -(torch.stack(log_probs) * returns).mean()
+
+        return loss
+    
+    def compute_batch_returns(self, rewards: List[Int]) -> List[Float]:
         returns = []
         R = 0
 
         for r in reversed(rewards):
             R = r + self.gamma * R
-            returns.insert(0, R) 
-
-        returns = torch.Tensor(returns)
-        
-        loss = -(torch.stack(log_probs) * returns).mean()
-
-        return loss
+            returns.insert(0, R)
+            
+        return returns
 
     def train_one_epoch_step(self, ) -> Tuple[List[Tensor], List[Int], List[Float], List[Tensor]]:
         """Function to take rollout in the environment. 
         """
-        batch_obs, batch_act, batch_rew, batch_log_probs = [], [], [], []
+        batch_obs, batch_act, batch_rew, batch_ret, batch_log_probs = [], [], [], [], []
         obs, _ = self.env.reset(seed=self.config.seed)
-        obs = torch.Tensor(obs)
-        done = False
 
-        while not done:
+        while True:
+            obs = torch.Tensor(obs)
+            batch_obs.append(obs)
+            assert isinstance(obs, Tensor)
             logits = self.policy(obs)
             act = self.get_action(logits)
             log_probs = self.get_log_probs(logits, act)
 
-            next_obs, reward, terminated, truncated, _ = self.env.step(act)
+            obs, reward, terminated, truncated, _ = self.env.step(act)
 
             done = terminated or truncated
-
-            batch_obs.append(obs)
+            
             batch_act.append(act)
             batch_rew.append(reward)
             batch_log_probs.append(log_probs)
-
-            obs = torch.Tensor(next_obs)
+            
+            if done:
+                # print("Got here")
+                temp_batch_ret = self.compute_batch_returns(batch_rew)
+                assert len(temp_batch_ret) == len(batch_rew)
+                batch_ret += self.compute_batch_returns(batch_rew)
+                
+                # trajectory-specific examples
+                batch_rew = []
+                obs, _ = self.env.reset(seed=self.config.seed)
+                
+                assert len(batch_ret) == len(batch_log_probs), f"{len(batch_ret)}, {len(batch_log_probs)}"
+            
+                if len(batch_log_probs) == self.config.batch_size:
+                    break
         
-        return batch_obs, batch_act, batch_rew, batch_log_probs
+        assert len(batch_ret) == len(batch_log_probs), f"{len(batch_ret)}, {len(batch_log_probs)}"
+        
+        return batch_obs, batch_act, batch_ret, batch_log_probs
 
   
 if __name__ == "__main__":

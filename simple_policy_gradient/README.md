@@ -15,7 +15,16 @@ The implementation in this repo is
 
 $$ \hat{g} = \nabla_\theta \mathcal{L}(\theta) = -\frac{1}{N}\sum_{i=1}^N \nabla_\theta \log \pi_\theta(a_i|s_i) \tilde{G}_i $$
 
-where $$ G_i = \sum_{k=i}^{T_{ep}} \gamma^{k-i} r_k $$ (discounted rewards) and $$ \tilde{G}_i $$ is normalized discounted rewards.
+where
+$$
+G_i = \sum_{k=i}^{T_{ep}} \gamma^{k-i} r_k
+$$
+(discounted rewards) and
+$$
+\tilde{G}_i
+$$
+is normalized discounted rewards.
+<!-- where $$ G_i = \sum_{k=i}^{T_{ep}} \gamma^{k-i} r_k $$ (discounted rewards) and $$ \tilde{G}_i $$ is normalized discounted rewards. -->
 ### Repository structure
 - `spg_cartpole.py` implements the code to run the vanilla policy gradient agent on Cartpole.
 - `videos` dir that contains video logs of evaluating the agent periodically.

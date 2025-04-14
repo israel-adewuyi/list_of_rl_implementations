@@ -10,8 +10,10 @@ from torch import Tensor
 from typing import Tuple, List
 from jaxtyping import Float, Int, Bool
 from dataclasses import dataclass
+from dotenv import load_dotenv
 from torch.distributions import Categorical
 
+load_dotenv()
 
 @dataclass
 class SPGArgs:
@@ -20,15 +22,16 @@ class SPGArgs:
     seed: Int = 0
     env_name: str = "CartPole-v1"
     hidden_size: Int = 64
-    num_epochs: Int = 20
+    num_epochs: Int = 50
     project_name: str = "policy_gradients"
     apply_discount: Bool = True
     gamma: Float = 0.99
     lr: Float = 0.002
-    batch_size: Int = 1000
+    batch_size: Int = 5000
+    device: str = "cuda:3"
 
     def __post_init__(self):
-        self.run_name = f"spg_{self.env_name}_lr={self.lr}_num_epochs={self.num_epochs}_seed={self.seed}_time={time.strftime('%Y-%m-%d %H:%M:%S')}"
+        self.run_name = f"spg_{self.env_name}_batch_size={self.batch_size}_num_epochs={self.num_epochs}_seed={self.seed}_time={time.strftime('%Y-%m-%d %H:%M:%S')}"
 
 def get_policy_network(hidden_state: int):
     return nn.Sequential(
@@ -44,9 +47,9 @@ class SimplePolicyGradient:
         self.env = gym.make(config.env_name)
         self.env.reset(seed=config.seed)
         self.config = config
-        self.gamma = 1.0 if config.apply_discount else config.gamma
+        self.gamma = config.gamma if config.apply_discount else 1.0
         self.epochs = config.num_epochs
-        self.policy = get_policy_network(hidden_state=config.hidden_size)
+        self.policy = get_policy_network(hidden_state=config.hidden_size).to(config.device)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=config.lr)
         wandb.init(project=config.project_name, name=config.run_name)
 
@@ -54,7 +57,7 @@ class SimplePolicyGradient:
         """Function to sample action from the logits output of the policy network
 
         Args:
-            logits (Float[Tensor, ... 2]): output of the policy network
+            logits (Float[Tensor, 2]): output of the policy network
 
         Returns:
             Int: sampled action
@@ -68,7 +71,7 @@ class SimplePolicyGradient:
     def train_agent(self, ):
         """Function to train the agent + log necessary metrics"""
         for step in tqdm(range(self.epochs)):
-            _, _, rewards, log_probs = self.train_one_epoch_step()
+            batch_len, rewards, undiscounted_batch_ret, log_probs = self.train_one_epoch_step()
 
             loss = self.compute_loss(rewards, log_probs)
             grad_norm = sum(p.grad.norm().item() for p in self.policy.parameters() if p.grad is not None)
@@ -79,9 +82,9 @@ class SimplePolicyGradient:
             wandb.log(
                 {
                     "loss": loss.item(),
-                    "rewards_sum": sum(rewards),
-                    "rewards_mean": np.array(rewards, dtype=np.float32).mean(),
-                    "episode_length": len(rewards), 
+                    # "rewards_sum": sum(rewards),
+                    "rewards_avg_per_episode": np.array(undiscounted_batch_ret, dtype=np.float32).mean(),
+                    "episode_length": np.mean(batch_len), 
                     "grad_norm": grad_norm
                 }, step
             )
@@ -99,9 +102,9 @@ class SimplePolicyGradient:
         Returns:
             Float: loss
         """
-        returns = torch.Tensor(returns)
+        returns = torch.Tensor(returns).to(self.config.device)
         returns = ((returns - returns.mean()) / (returns.std() + 1e-8))
-        loss = -(torch.stack(log_probs) * returns).mean()
+        loss = -(torch.stack(log_probs).to(self.config.device) * returns).mean()
 
         return loss
     
@@ -118,47 +121,34 @@ class SimplePolicyGradient:
     def train_one_epoch_step(self, ) -> Tuple[List[Tensor], List[Int], List[Float], List[Tensor]]:
         """Function to take rollout in the environment. 
         """
-        batch_obs, batch_act, batch_rew, batch_ret, batch_log_probs = [], [], [], [], []
+        batch_len, batch_rew, batch_ret, undiscounted_batch_ret, batch_log_probs = [], [], [], [], []
         obs, _ = self.env.reset(seed=self.config.seed)
 
         while True:
-            obs = torch.Tensor(obs)
-            batch_obs.append(obs)
-            assert isinstance(obs, Tensor)
+            obs = torch.Tensor(obs).to(self.config.device)
             logits = self.policy(obs)
             act = self.get_action(logits)
             log_probs = self.get_log_probs(logits, act)
-
             obs, reward, terminated, truncated, _ = self.env.step(act)
-
             done = terminated or truncated
             
-            batch_act.append(act)
             batch_rew.append(reward)
             batch_log_probs.append(log_probs)
             
             if done:
-                # print("Got here")
+                undiscounted_batch_ret.append(sum(batch_rew))
                 temp_batch_ret = self.compute_batch_returns(batch_rew)
-                assert len(temp_batch_ret) == len(batch_rew)
-                batch_ret += self.compute_batch_returns(batch_rew)
-                
-                # trajectory-specific examples
+                batch_len.append(len(batch_rew))
+                batch_ret += temp_batch_ret
                 batch_rew = []
                 obs, _ = self.env.reset(seed=self.config.seed)
-                
-                assert len(batch_ret) == len(batch_log_probs), f"{len(batch_ret)}, {len(batch_log_probs)}"
-            
-                if len(batch_log_probs) == self.config.batch_size:
+                if len(batch_log_probs) >= self.config.batch_size:
                     break
         
-        assert len(batch_ret) == len(batch_log_probs), f"{len(batch_ret)}, {len(batch_log_probs)}"
-        
-        return batch_obs, batch_act, batch_ret, batch_log_probs
+        return batch_len, batch_ret, undiscounted_batch_ret, batch_log_probs
 
   
 if __name__ == "__main__":
     args = SPGArgs()
-
     spg = SimplePolicyGradient(args)
     spg.train_agent()

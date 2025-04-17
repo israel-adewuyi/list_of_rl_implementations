@@ -86,26 +86,5 @@ def policy_iteration_loop(env: Environment, gamma=0.99, max_iterations=10_000):
 
 if __name__ == "__main__":
     norvig = Norvig(3, 4, -0.04)
-    # pi_random = np.random.randint(0, 4, (12,))
-    pi_zeros = np.zeros((12, ), dtype=int)
-    norvig.render(pi_zeros)
-    # V = policy_eval_numerical(norvig, pi_random)
-
     pi = policy_iteration_loop(norvig)
     norvig.render(pi)
-
-    # print("Got here")
-    # pi_refined = policy_improvement(norvig, V, 0.99)
-    # pi_reference = policy_improvement_ref(norvig, V, 0.99)
-
-    # print(f"Got to the second checkpoint")
-
-    # if np.allclose(pi_refined, pi_reference):
-    #     print("Both policies are the same")
-    # else:
-    #     print("They are so f-ing different")
-    #     print(pi_refined)
-    #     print(pi_reference)
-
-    # print(f"Got to the third checkpoint")
-

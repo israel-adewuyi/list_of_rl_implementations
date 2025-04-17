@@ -34,9 +34,7 @@ def policy_evaluation(
             assert isinstance(cur_v[state], float)
 
         if max(abs(cur_v - V)) < eps:
-            print(f"Policy eval steps - {_}")
             break
-
         V = cur_v.copy()
     return V
 
@@ -76,7 +74,6 @@ def policy_iteration_loop(env: Environment, gamma=0.99, max_iterations=10_000):
         V = policy_evaluation(env, pi, gamma=gamma, eps=1e-8, max_iterations=max_iterations)
         pi_better = policy_improvement(env, V, gamma)
         if np.array_equal(pi_better, pi):
-            print(_)
             return pi_better
         else:
             pi = pi_better
@@ -94,6 +91,6 @@ if __name__ == "__main__":
     parser.add_argument("--height", type=int, required=True)
     parser.add_argument("--width", type=int, required=True)
     parser.add_argument("--penalty", type=float, default=-0.04)
-    
+
     args = parser.parse_args()
     main(args.height, args.width, args.penalty)

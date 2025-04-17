@@ -1,4 +1,5 @@
 import einops
+import argparse
 import numpy as np
 from env import Environment, Norvig
 
@@ -82,9 +83,17 @@ def policy_iteration_loop(env: Environment, gamma=0.99, max_iterations=10_000):
     print(f"Failed to converge after {max_iterations} steps.")
     return pi
 
-
-
-if __name__ == "__main__":
-    norvig = Norvig(3, 4, -0.04)
+def main(height: int, width: int, penalty: float = -0.04) -> None:
+    """Main function - Run policy iteration on a grid world of specified dimensions."""
+    norvig = Norvig(height, width, penalty)
     pi = policy_iteration_loop(norvig)
     norvig.render(pi)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run policy iteration on grid world env")
+    parser.add_argument("--height", type=int, required=True)
+    parser.add_argument("--width", type=int, required=True)
+    parser.add_argument("--penalty", type=float, default=-0.04)
+    
+    args = parser.parse_args()
+    main(args.height, args.width, args.penalty)

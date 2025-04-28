@@ -1,4 +1,5 @@
 import math
+import random
 
 from typing import List, Optional
 from utils import generate_random_board
@@ -43,13 +44,13 @@ class Board:
             return True
         return False
 
-    def make_move(self, player):
+    def make_move(self, player: str, position: int) -> None:
         """Makes a move by placing the player's str. 
 
         Args:
             player (_type_): _description_
         """
-        pass
+        self.board[position] = player
 
     def get_legal_moves(self, ) -> List[int]:
         """Gets a list of position on the current board that is unoccupied i.e value at this position is None
@@ -77,8 +78,13 @@ class Node:
         self.visits = 0
         self.wins = 0
         
-    def make_move(self, ):
-        return self.untried_moves
+    def make_move(self, position: int) -> "Node":
+        new_state = Board(self.state.board.copy(), self.state.current_player)
+        new_state.make_move(self.state.current_player, position)
+        new_node = Node(new_state, parents=self)
+        self.children.append(new_node)
+        self.untried_moves.remove(position)
+        return new_node # TODO: Why am I returning this? 
 
 class MCTS:
     """Handles the MCTS logic (Selection, Expansion, Simulation, Backpropagation)"""
@@ -98,9 +104,13 @@ class MCTS:
         return (node.wins / node.visits) + self.c * (math.sqrt(math.log(node.parents.visits) / node.visits))
 
 
-    def expansion(self, ):
-        # add a random node to the current node
-        pass
+    def expansion(self, node: Node) -> "Node":
+        # print(node.untried_moves)
+        if node.untried_moves:
+            # print("Got to thiss pos in expansion")
+            move = random.choice(node.untried_moves)
+            return node.make_move(move)
+        return node
 
     def simulation(self, ):
         # while(True):
@@ -113,7 +123,11 @@ class MCTS:
     def run(self, num_iterations: int):
         for _ in range(num_iterations):
             selected_node = self.selection(self.root)
+            print("Selected node is")
             print(selected_node.state.__repr__())
+            self.expansion(selected_node)
+            print(self.root.children)
+            # print(selected_node.state.__repr__())
             # select node to explore and expand it
             # simulate game play till game over
             # do backpropagation``

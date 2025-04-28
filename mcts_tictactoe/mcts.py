@@ -1,3 +1,5 @@
+import math
+
 from typing import List, Optional
 from utils import generate_random_board
 
@@ -37,7 +39,7 @@ class Board:
         Returns:
             bool: _description_
         """
-        if self.is_winning_state() or self.get_legal_moves() is not None:
+        if self.is_winning_state() or self.get_legal_moves() is not None: #TODO: Implement condition for a draw
             return True
         return False
 
@@ -49,7 +51,7 @@ class Board:
         """
         pass
 
-    def get_legal_moves(self, ) -> List[str]:
+    def get_legal_moves(self, ) -> List[int]:
         """Gets a list of position on the current board that is unoccupied i.e value at this position is None
 
         Returns:
@@ -59,17 +61,15 @@ class Board:
         for idx, position in enumerate(self.board):
             if position == " ":
                 legal_moves.append(idx)
-        
         return legal_moves
-    
+
     def __repr__(self) -> str:
-        return f"{self.board[0 : 3]} \n{self.board[3 : 6]} \n{self.board[6 : 9]}"
-        
+        return f"{self.board[0 : 3]} \n{self.board[3 : 6]} \n{self.board[6 : 9]}"    
 
 class Node:
     """Represents each state in the MCTS tree, tracking visits, rewards, and untried moves."""
     
-    def __init__(self, board_state: Board, _=None, parents: Board=None) -> None:
+    def __init__(self, board_state: Board=None, parents: Board=None) -> None:
         self.state = board_state
         self.parents = parents
         self.children = []
@@ -82,14 +82,21 @@ class Node:
 
 class MCTS:
     """Handles the MCTS logic (Selection, Expansion, Simulation, Backpropagation)"""
-    
-    def __init__(self, root: Node):
-        # this should be of type node
-        pass
+
+    def __init__(self, root: Node, c: float = 0.99):
+        self.root = root
+        self.c = c
 
     def selection(self, node: Node):
-        # Should do ucb eval for the node passed to it.
-        pass
+        while node.children and not node.untried_moves:
+            node = max(node.children, key=self._UCB)
+        return node
+
+    def _UCB(self, node: Node) -> float:
+        if node.visits == 0:
+            return float('inf')
+        return (node.wins / node.visits) + self.c * (math.sqrt(math.log(node.parents.visits) / node.visits))
+
 
     def expansion(self, ):
         # add a random node to the current node
@@ -104,8 +111,9 @@ class MCTS:
         pass
 
     def run(self, num_iterations: int):
-        pass
-        # for _ in range(num_iterations):
+        for _ in range(num_iterations):
+            selected_node = self.selection(self.root)
+            print(selected_node.state.__repr__())
             # select node to explore and expand it
             # simulate game play till game over
             # do backpropagation``
@@ -119,6 +127,10 @@ if __name__ == "__main__":
     print(init_board.__repr__())
     print(init_board.is_winning_state())
     
+    root = Node(init_board)
+    mcts = MCTS(root)
+    mcts.run(2)
     
-    temp_node = Node(board_state=init_board)
-    print(temp_node.make_move())
+    
+    # temp_node = Node(board_state=init_board)
+    # print(temp_node.make_move())

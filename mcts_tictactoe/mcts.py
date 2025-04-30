@@ -93,7 +93,7 @@ class MCTS:
         self.root = root
         self.c = c
 
-    def selection(self, node: Node):
+    def selection(self, node: Node) -> Node:
         while node.children and not node.untried_moves:
             node = max(node.children, key=self._UCB)
         return node
@@ -104,7 +104,7 @@ class MCTS:
         return (node.wins / node.visits) + self.c * (math.sqrt(math.log(node.parents.visits) / node.visits))
 
 
-    def expansion(self, node: Node) -> "Node":
+    def expansion(self, node: Node) -> Node:
         # print(node.untried_moves)
         if node.untried_moves:
             # print("Got to thiss pos in expansion")
@@ -126,7 +126,8 @@ class MCTS:
             print("Selected node is")
             print(selected_node.state.__repr__())
             self.expansion(selected_node)
-            print(self.root.children)
+            print("Child of selected node is")
+            print(self.root.children[0].state.__repr__())
             # print(selected_node.state.__repr__())
             # select node to explore and expand it
             # simulate game play till game over
@@ -139,7 +140,7 @@ if __name__ == "__main__":
     print("Random board generated: ", board)
     init_board = Board(board=board, current_player="O")
     print(init_board.__repr__())
-    print(init_board.is_winning_state())
+    # print(init_board.is_winning_state())
     
     root = Node(init_board)
     mcts = MCTS(root)

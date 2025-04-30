@@ -11,6 +11,7 @@ class Board:
     def __init__(self, board: List[Optional[str]], current_player: str = "X") -> None:
         self.board = board if board is not None else [" " for _ in range(9)] 
         self.current_player = current_player
+        self.next_player = "X" if current_player == "O" else "O"
 
     def is_winning_state(self, player: str = None) -> bool:
         player = player if player else self.current_player
@@ -21,8 +22,14 @@ class Board:
         for idx in range(3):
             flag |= self._check_col_win(idx, player)
         flag |= self._check_diag_win(player)
-        print(flag)
+        # print(flag)
         return flag
+
+    def is_draw_state(self) -> bool:
+        countx = sum(player == "X" for player in self.board)
+        counto = sum(player == "O" for player in self.board)
+        countempty = sum(player == " " for player in self.board)
+        return (countempty == 0)
 
     def _check_row_win(self, idx: int, player: str) -> bool:
         assert idx % 3 == 0, f"The first index in a row should be a multiple of 3, but getting {idx}"
@@ -40,9 +47,9 @@ class Board:
         Returns:
             bool: _description_
         """
-        if self.is_winning_state() or len(self.get_legal_moves()) == 0 : 
-            return True
-        return False
+        return (self.is_winning_state(self.current_player) or
+                self.is_winning_state(self.next_player) or
+                len(self.get_legal_moves()) == 0)
 
     def make_move(self, player: str, position: int) -> None:
         """Makes a move by placing the player's str. 
@@ -53,6 +60,7 @@ class Board:
         assert self.board[position] == " ", "Entry to be moved to should be empty"
         self.board[position] = player
         self.current_player = "O" if player is "X" else "X"
+        self.next_player = player
 
     def get_legal_moves(self, ) -> List[int]:
         """Gets a list of position on the current board that is unoccupied i.e value at this position is None
@@ -108,17 +116,32 @@ class MCTS:
 
 
     def expansion(self, node: Node) -> Node:
-        # print(node.untried_moves)
         if node.untried_moves:
-            # print("Got to thiss pos in expansion")
             move = random.choice(node.untried_moves)
             return node.make_move(move)
         return node
 
-    def simulation(self, ):
-        # while(True):
-            # simulate game till end
-        pass
+    def simulation(self, node: Node) -> int:
+        if node.state.is_game_over():
+            if node.state.is_winning_state(self.root.state.current_player):
+                return 1
+            elif node.state.is_winning_state(self.root.state.next_player):
+                return -1
+            return 0
+
+        sim_board = Board(node.state.board.copy(), node.state.current_player)
+        # Simulate until game over
+        while not sim_board.is_game_over():
+            legal_moves = sim_board.get_legal_moves()
+            move = random.choice(legal_moves)
+            sim_board.make_move(sim_board.current_player, move)
+
+        # Evaluate outcome relative to root player
+        if sim_board.is_winning_state(self.root.state.current_player):
+            return 1
+        elif sim_board.is_winning_state(self.root.state.next_player):
+            return -1
+        return 0
 
     def backpropagation(self, ):
         pass
@@ -126,29 +149,26 @@ class MCTS:
     def run(self, num_iterations: int):
         for _ in range(num_iterations):
             selected_node = self.selection(self.root)
-            print("Selected node is")
-            print(selected_node.state.__repr__())
-            self.expansion(selected_node)
-            print("Child of selected node is")
-            print(self.root.children[0].state.__repr__())
-            # print(selected_node.state.__repr__())
+            new_node = self.expansion(selected_node)
             # select node to explore and expand it
+            reward = self.simulation(new_node)
             # simulate game play till game over
             # do backpropagation``
 
 
 if __name__ == "__main__":
     board = generate_random_board(include_space=False, seed=2)
-    # board = ['X', '', 'O', 'X', 'O', 'O', 'O', '', 'O']
+    # board = ['X', 'O', 'X', 'O', 'O', 'X', 'X', 'X', 'O']
     print("Random board generated: ", board)
     init_board = Board(board=board, current_player="O")
     print(init_board.__repr__())
-    # print(init_board.is_winning_state())
+    # print(init_board.is_winning_state("O"))
+    # print(init_board.is_winning_state("X"))
+    # print(init_board.is_draw_state())
     
     root = Node(init_board)
     mcts = MCTS(root)
-    mcts.run(2)
-    
-    
+    mcts.run(1)
+
     # temp_node = Node(board_state=init_board)
     # print(temp_node.make_move())

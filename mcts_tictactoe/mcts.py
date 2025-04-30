@@ -40,7 +40,7 @@ class Board:
         Returns:
             bool: _description_
         """
-        if self.is_winning_state() or self.get_legal_moves() is not None: #TODO: Implement condition for a draw
+        if self.is_winning_state() or len(self.get_legal_moves()) == 0 : 
             return True
         return False
 
@@ -50,7 +50,9 @@ class Board:
         Args:
             player (_type_): _description_
         """
+        assert self.board[position] == " ", "Entry to be moved to should be empty"
         self.board[position] = player
+        self.current_player = "O" if player is "X" else "X"
 
     def get_legal_moves(self, ) -> List[int]:
         """Gets a list of position on the current board that is unoccupied i.e value at this position is None
@@ -101,7 +103,8 @@ class MCTS:
     def _UCB(self, node: Node) -> float:
         if node.visits == 0:
             return float('inf')
-        return (node.wins / node.visits) + self.c * (math.sqrt(math.log(node.parents.visits) / node.visits))
+        parent_visits = node.parents.visits if node.parents else self.root.visits
+        return (node.wins / node.visits) + self.c * math.sqrt(math.log(parent_visits) / node.visits)
 
 
     def expansion(self, node: Node) -> Node:

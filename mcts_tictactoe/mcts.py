@@ -1,8 +1,14 @@
 import math
 import random
+# import logging
 
+# logging.basicConfig(level=logging.DEBUG)
+
+from tqdm import tqdm
 from typing import List, Optional
 from utils import generate_random_board
+from tracker import visualize_tree
+from tree_tracker import save_tree_state
 
 
 class Board:
@@ -22,12 +28,9 @@ class Board:
         for idx in range(3):
             flag |= self._check_col_win(idx, player)
         flag |= self._check_diag_win(player)
-        # print(flag)
         return flag
 
     def is_draw_state(self) -> bool:
-        countx = sum(player == "X" for player in self.board)
-        counto = sum(player == "O" for player in self.board)
         countempty = sum(player == " " for player in self.board)
         return (countempty == 0)
 
@@ -59,7 +62,7 @@ class Board:
         """
         assert self.board[position] == " ", "Entry to be moved to should be empty"
         self.board[position] = player
-        self.current_player = "O" if player is "X" else "X"
+        self.current_player = "O" if player == "X" else "X"
         self.next_player = player
 
     def get_legal_moves(self, ) -> List[int]:
@@ -116,12 +119,13 @@ class MCTS:
 
 
     def expansion(self, node: Node) -> Node:
-        if node.untried_moves:
+        if len(node.untried_moves) != 0:
             move = random.choice(node.untried_moves)
             return node.make_move(move)
         return node
 
     def simulation(self, node: Node) -> int:
+        # print(f"Current player is meant to be {node.state.current_player}")
         if node.state.is_game_over():
             if node.state.is_winning_state(self.root.state.current_player):
                 return 1
@@ -135,49 +139,50 @@ class MCTS:
             legal_moves = sim_board.get_legal_moves()
             move = random.choice(legal_moves)
             sim_board.make_move(sim_board.current_player, move)
+            
+        # print(f"After simulation, state of the board is\n{sim_board.__repr__()}")
 
         # Evaluate outcome relative to root player
-        if sim_board.is_winning_state(self.root.state.current_player):
+        if sim_board.is_winning_state(node.state.current_player):
             return 1
-        elif sim_board.is_winning_state(self.root.state.next_player):
+        elif sim_board.is_winning_state(node.state.next_player):
             return -1
         return 0
 
     def backpropagation(self, node: Node, reward: int) -> None:
+        assert node is not None, "Node cannot be None"
+        assert reward in [-1, 0, 1], f"Invalid reward: {reward}"
         while node is not None:
-            print("In backprop")
-            print(node.state.__repr__())
-            print("Parent is")
-            if node.parents:
-                print(node.parents.state.__repr__())
-            else:
-                print("None")
+            # logging.debug(f"In backprop\n{node.state}\nParent is\n{node.parents.state if node.parents else 'None'}")
             node.visits += 1
             node.wins += reward
             node = node.parents
+            reward *= -1
 
     def run(self, num_iterations: int):
-        for _ in range(num_iterations):
+        for _ in tqdm(range(num_iterations)):
+            # print(f"Starting iteration {_}")
             selected_node = self.selection(self.root)
             new_node = self.expansion(selected_node)
+            # print(f"New node that has been selected and expanded \n{new_node.state.__repr__()}")
             reward = self.simulation(new_node)
             self.backpropagation(new_node, reward)
+            
+            # visualize_tree(self.root, _)
+            
+            # print(f"Root stats\n{self.root.wins, self.root.visits}")
+            # print(f"Roots current player is \n{self.root.state.current_player}")
+
+            if _ == num_iterations - 1:
+                save_tree_state(self.root, _)
 
 
 if __name__ == "__main__":
     board = generate_random_board(include_space=False, seed=2)
-    # board = ['X', 'O', 'X', 'O', 'O', 'X', 'X', 'X', 'O']
+    # board = [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',]
     print("Random board generated: ", board)
     init_board = Board(board=board, current_player="O")
-    print(init_board.__repr__())
-    # print(init_board.is_winning_state("O"))
-    # print(init_board.is_winning_state("X"))
-    # print(init_board.is_draw_state())
     
     root = Node(init_board)
-    print(root.parents)
     mcts = MCTS(root)
-    mcts.run(1)
-
-    # temp_node = Node(board_state=init_board)
-    # print(temp_node.make_move())
+    mcts.run(1000)

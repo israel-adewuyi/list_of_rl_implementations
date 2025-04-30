@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>MCTS Tree Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      .link {
+        fill: none;
+        stroke: #aaa;
+        stroke-width: 1.5px;
+      }
+      .node text {
+        font-family: sans-serif;
+        font-size: 10px;
+        text-anchor: middle;
+      }
+      .cell {
+        stroke: black;
+        stroke-width: 1px;
+        fill: white;
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="1800" height="1000"></svg>
+
+    <script>
+      const svg = d3.select("svg"),
+        width = +svg.attr("width"),
+        height = +svg.attr("height");
+
+      const g = svg.append("g").attr("transform", "translate(40,0)");
+
+      d3.json("tree_iter_FINAL.json").then(function (data) {
+        const root = d3.hierarchy(data);
+        const treeLayout = d3.tree().size([height - 100, width - 200]);
+        treeLayout(root);
+
+        // Draw links
+        g.selectAll(".link")
+          .data(root.links())
+          .enter()
+          .append("path")
+          .attr("class", "link")
+          .attr(
+            "d",
+            d3
+              .linkHorizontal()
+              .x((d) => d.y)
+              .y((d) => d.x)
+          );
+
+        // Draw nodes
+        const node = g
+          .selectAll(".node")
+          .data(root.descendants())
+          .enter()
+          .append("g")
+          .attr("class", "node")
+          .attr("transform", (d) => `translate(${d.y},${d.x})`);
+
+        // Draw 3x3 board
+        const cellSize = 15;
+        node.each(function (d) {
+          const board = d.data.board || ".........";
+          const gBoard = d3.select(this).append("g");
+
+          for (let i = 0; i < 9; i++) {
+            const x = (i % 3) * cellSize - cellSize * 1.5;
+            const y = Math.floor(i / 3) * cellSize - cellSize * 1.5;
+
+            gBoard
+              .append("rect")
+              .attr("class", "cell")
+              .attr("x", x)
+              .attr("y", y)
+              .attr("width", cellSize)
+              .attr("height", cellSize);
+
+            gBoard
+              .append("text")
+              .attr("x", x + cellSize / 2)
+              .attr("y", y + cellSize / 2 + 3)
+              .text(board[i])
+              .style("font-size", "12px");
+          }
+        });
+
+        // Show metadata under board
+        node
+          .append("text")
+          .attr("dy", "3em")
+          .text((d) => `vis: ${d.data.visits}, win: ${d.data.wins}`);
+      });
+    </script>
+  </body>
+</html>

@@ -87,7 +87,7 @@ class Node:
         self.untried_moves = self.state.get_legal_moves()
         self.visits = 0
         self.wins = 0
-        
+
     def make_move(self, position: int) -> "Node":
         new_state = Board(self.state.board.copy(), self.state.current_player)
         new_state.make_move(self.state.current_player, position)
@@ -143,17 +143,25 @@ class MCTS:
             return -1
         return 0
 
-    def backpropagation(self, ):
-        pass
+    def backpropagation(self, node: Node, reward: int) -> None:
+        while node is not None:
+            print("In backprop")
+            print(node.state.__repr__())
+            print("Parent is")
+            if node.parents:
+                print(node.parents.state.__repr__())
+            else:
+                print("None")
+            node.visits += 1
+            node.wins += reward
+            node = node.parents
 
     def run(self, num_iterations: int):
         for _ in range(num_iterations):
             selected_node = self.selection(self.root)
             new_node = self.expansion(selected_node)
-            # select node to explore and expand it
             reward = self.simulation(new_node)
-            # simulate game play till game over
-            # do backpropagation``
+            self.backpropagation(new_node, reward)
 
 
 if __name__ == "__main__":
@@ -167,6 +175,7 @@ if __name__ == "__main__":
     # print(init_board.is_draw_state())
     
     root = Node(init_board)
+    print(root.parents)
     mcts = MCTS(root)
     mcts.run(1)
 

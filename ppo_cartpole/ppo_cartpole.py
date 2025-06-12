@@ -109,6 +109,17 @@ def get_actor_and_critic_classic(num_obs: int, num_actions: int) -> Tuple[nn.Mod
 
     return actor, critic
 
+def get_minibatch_indices(rng: Generator, batch_size: int, minibatch_size: int) -> list[np.ndarray]:
+    """
+    Return a list of length `num_minibatches`, where each element is an array of `minibatch_size` and the union of all
+    the arrays is the set of indices [0, 1, ..., batch_size - 1] where `batch_size = num_steps_per_rollout * num_envs`.
+    """
+    assert batch_size % minibatch_size == 0
+    num_minibatches = batch_size // minibatch_size
+    indices = np.arange(batch_size)
+    indices = rng.shuffle(indices)
+    indices = indices.reshape((num_minibatches, minibatch_size))
+    return list(indices)
 
 
 class PPOTrainer:

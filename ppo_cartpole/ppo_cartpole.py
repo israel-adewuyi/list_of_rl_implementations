@@ -67,7 +67,7 @@ def get_actor_critic(
     device: str, 
     mode: Literal["classic-control", "atari", "mujoco"] = "classic-control",
 ) -> Tuple[nn.Module, nn.Module]:
-    
+
     assert mode in ["classic-control", "atari", "mujoco"], mode
 
     obs_shape = envs.single_observation_space.shape
@@ -85,9 +85,9 @@ def get_actor_critic(
     if mode == "classic-control":
         actor, critic = get_actor_and_critic_classic(num_obs, num_actions)
     if mode == "atari":
-        actor, critic = get_actor_and_critic_atari(obs_shape, num_actions)  # you'll implement these later
+        actor, critic = get_actor_and_critic_atari(obs_shape, num_actions) 
     if mode == "mujoco":
-        actor, critic = get_actor_and_critic_mujoco(num_obs, num_actions)  # you'll implement these later
+        actor, critic = get_actor_and_critic_mujoco(num_obs, num_actions)
 
     return actor.to(device), critic.to(device)
 
@@ -111,8 +111,9 @@ def get_actor_and_critic_classic(num_obs: int, num_actions: int) -> Tuple[nn.Mod
 
 def get_minibatch_indices(rng: Generator, batch_size: int, minibatch_size: int) -> list[np.ndarray]:
     """
-    Return a list of length `num_minibatches`, where each element is an array of `minibatch_size` and the union of all
-    the arrays is the set of indices [0, 1, ..., batch_size - 1] where `batch_size = num_steps_per_rollout * num_envs`.
+    Return a list of length `num_minibatches`, where each element is an array of `minibatch_size` 
+    and the union of all the arrays is the set of indices [0, 1, ..., batch_size - 1] where 
+    `batch_size = num_steps_per_rollout * num_envs`.
     """
     assert batch_size % minibatch_size == 0
     num_minibatches = batch_size // minibatch_size
@@ -129,7 +130,7 @@ class PPOTrainer:
         self.envs = gym.vector.SyncVectorEnv(
             [make_env(idx=idx, run_name=self.run_name, **args.__dict__) for idx in range(args.num_envs)]
         )
-        
+
         self.actor, self.critic = get_actor_critic(self.envs, self.args.device, self.args.mode)
 
 

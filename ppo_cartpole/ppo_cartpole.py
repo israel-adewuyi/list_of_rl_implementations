@@ -32,7 +32,7 @@ class PPOArgs:
     use_wandb: bool = False
     video_log_freq: int | None = None
     wandb_project_name: str = "PPOCartPole"
-    wandb_entity: str = None
+    wandb_entity: str = "self_research_"
 
     # Duration of different phases
     total_timesteps: int = 500_000
@@ -304,7 +304,7 @@ class PPOAgent:
         probs = Categorical(logits=logits)
         actions = probs.sample()
 
-        next_obs, rewards, next_truncated, next_terminated, infos = self.envs.step(actions.cpu().numpy())
+        next_obs, rewards, next_terminated, next_truncated, infos = self.envs.step(actions.cpu().numpy())
 
         log_probs = probs.log_prob(actions).cpu().numpy()
         with torch.inference_mode():
@@ -556,6 +556,6 @@ def make_optimizer(
 
 if __name__ == "__main__":
     # changing this also changes minibatch_size and total_training_steps
-    args = PPOArgs(num_minibatches=2)
+    args = PPOArgs(use_wandb=True, video_log_freq=50)
     trainer = PPOTrainer(args)
     trainer.train()

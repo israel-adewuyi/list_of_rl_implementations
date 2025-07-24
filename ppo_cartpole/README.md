@@ -55,7 +55,7 @@ The `PPOArgs` class in `ppo_cartpole.py` contains all the hyperparams used in th
 
 ### Culmulative rewards
 
-![rewards](assets/agent_rewards.png)
+![rewards](assets/episode_reward.png)
 
 ### To run
 

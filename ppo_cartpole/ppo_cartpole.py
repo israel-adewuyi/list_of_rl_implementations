@@ -555,7 +555,6 @@ def make_optimizer(
 
 
 if __name__ == "__main__":
-    # changing this also changes minibatch_size and total_training_steps
     args = PPOArgs(use_wandb=True, video_log_freq=50)
     trainer = PPOTrainer(args)
     trainer.train()

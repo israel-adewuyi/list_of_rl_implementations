@@ -1,3 +1,5 @@
+import torch
+import numpy as np
 import gymnasium as gym
 
 
@@ -37,3 +39,22 @@ def make_env(
         return env
 
     return thunk
+
+def set_global_seeds(seed: int) -> None:
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+    np.random.seed(seed)
+
+def get_episode_data_from_infos(infos: dict) -> dict[str, int | float] | None:
+    """
+    Helper function: returns dict of data from the first terminated environment, if at least one terminated.
+    """
+    for final_info in infos.get("final_info", []):
+        if final_info is not None and "episode" in final_info:
+            return {
+                "episode_length": final_info["episode"]["l"].item(),
+                "episode_reward": final_info["episode"]["r"].item(),
+                "episode_duration": final_info["episode"]["t"].item(),
+            }

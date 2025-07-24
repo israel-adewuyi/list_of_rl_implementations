@@ -59,4 +59,4 @@ The `PPOArgs` class in `ppo_cartpole.py` contains all the hyperparams used in th
 
 ### To run
 
-`python simple_policy_gradient/spg_cartpole.py`
+`python ppo_cartpole/ppo_cartpole.py`

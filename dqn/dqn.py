@@ -1,3 +1,4 @@
+import time
 import torch
 import wandb
 import numpy as np
@@ -6,8 +7,13 @@ from dataclasses import dataclass
 from torch import Tensor
 from jaxtyping import Float, Int
 import torch.nn as nn
-
-from utils import linear_schedule, get_episode_data_from_infos
+from tqdm import tqdm
+from utils import (
+    linear_schedule,
+    get_episode_data_from_infos,
+    set_global_seeds,
+    make_env
+    )
 
 @dataclass
 class DQNArgs:
@@ -29,7 +35,7 @@ class DQNArgs:
     buffer_size: int = 10_000
 
     # Optimization hparams
-    batch_size: int = 128
+    batch_size: int = 32
     learning_rate: float = 2.5e-4
 
     # RL-specific
@@ -38,12 +44,13 @@ class DQNArgs:
     start_e: float = 1.0
     end_e: float = 0.1
 
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     def __post_init__(self):
         assert self.total_timesteps - self.buffer_size >= self.steps_per_train
         self.total_training_steps = (self.total_timesteps - self.buffer_size) // self.steps_per_train
-        self.video_save_path = section_dir / "videos"
-        
-        
+        self.video_save_path = "videos"
+    
 class QNetwork(nn.Module):
     """Class representing the Q-Network. 
     The QNetwork maps states to distribution of qvalues over actions
@@ -69,11 +76,11 @@ class QNetwork(nn.Module):
 class ReplayBufferSamples:
     """Should be an item to be 
     """
-    obs: Float[Tensor, "sample_size, *obs_shape"]
+    obs: Float[Tensor, "sample_size *obs_shape"]
     actions: Float[Tensor, "sample_size"] # Why action shape?? 
     rewards: Float[Tensor, "sample_size"]
     terminated: Float[Tensor, "sample_size"]
-    next_obs: Float[Tensor, "sample_size, obs_shape"]
+    next_obs: Float[Tensor, "sample_size obs_shape"]
 
 class ReplayBuffer:
     """ReplayBuffer to store experiences
@@ -93,11 +100,11 @@ class ReplayBuffer:
 
     def add(
         self,
-        obs: Float[Tensor, "sample_size, *obs_shape"],
-        actions: Float[Tensor, "sample_size, *action_shape"], # Why action shape?? 
+        obs: Float[Tensor, "sample_size *obs_shape"],
+        actions: Float[Tensor, "sample_size *action_shape"], # Why action shape?? 
         rewards: Float[Tensor, "sample_size"],
         terminated: Float[Tensor, "sample_size"],
-        next_obs: Float[Tensor, "sample_size, obs_shape"]
+        next_obs: Float[Tensor, "sample_size obs_shape"]
     ):
         for data, expected_shape in zip(
             [obs, actions, rewards, terminated, next_obs], [self.obs_shape, 
@@ -133,12 +140,13 @@ def epsilon_greedy_policy(
     rng: np.random.Generator,
     obs: Float[np.ndarray, "num_envs *obs_shape"],
     epsilon: float,
+    device: torch.device
 ) -> Int[np.ndarray, "num_envs *action_shape"]: 
     """
     Take random actions with probability epsilon and greedy actions
     the rest of the time
     """
-    obs = torch.from_numpy(obs).to(q_network.device)
+    obs = torch.from_numpy(obs).to(device)
 
     num_actions = envs.single_action_space.n
     if rng.random() < epsilon:
@@ -158,7 +166,8 @@ class DQNAgent:
         exploration_fraction: float,
         total_timesteps: int,
         buffer: ReplayBuffer,
-        rng: np.random.Generator
+        rng: np.random.Generator,
+        args: DQNArgs,
     ):
         self.envs = envs
         self.q_network = q_network
@@ -168,6 +177,7 @@ class DQNAgent:
         self.total_timesteps = total_timesteps
         self.buffer = buffer
         self.rng = rng
+        self.args = args
 
         self.step = 0
         self.obs, _ = self.envs.reset()
@@ -185,11 +195,11 @@ class DQNAgent:
         self.buffer.add(self.obs, actions, rewards, terminated, true_next_obs)
         self.step += self.envs.num_envs
         return infos
-    
+
     def get_actions(self, obs: np.ndarray) -> np.ndarray:
         self.epsilon = linear_schedule(self.step, self.start_eps, self.end_eps, self.exploration_fraction,
                                        self.total_timesteps)
-        return epsilon_greedy_policy(self.envs, self.q_network, self.rng, obs, self.epsilon)
+        return epsilon_greedy_policy(self.envs, self.q_network, self.rng, obs, self.epsilon, self.args.device)
 
 class DQNTrainer:
     def __init__(self, args: DQNArgs):
@@ -212,33 +222,39 @@ class DQNTrainer:
         self.buffer = ReplayBuffer(num_envs, obs_shape, action_shape, args.buffer_size, args.seed)
 
         # Create our networks & optimizer (target network should be initialized with a copy of the Q-network's weights)
-        self.q_network = QNetwork(obs_shape, num_actions).to(device)
-        self.target_network = QNetwork(obs_shape, num_actions).to(device)
+        self.q_network = QNetwork(obs_shape, num_actions).to(args.device)
+        self.target_network = QNetwork(obs_shape, num_actions).to(args.device)
         self.target_network.load_state_dict(self.q_network.state_dict())
-        self.optimizer = t.optim.AdamW(self.q_network.parameters(), lr=args.learning_rate)
+        self.optimizer = torch.optim.AdamW(self.q_network.parameters(), lr=args.learning_rate)
 
         # Create our agent
         self.agent = DQNAgent(
-            self.envs,
-            self.buffer,
-            self.q_network,
-            args.start_e,
-            args.end_e,
-            args.exploration_fraction,
-            args.total_timesteps,
-            self.rng,
+            envs=self.envs,
+            buffer=self.buffer,
+            q_network=self.q_network,
+            start_eps=args.start_e,
+            end_eps=args.end_e,
+            exploration_fraction=args.exploration_fraction,
+            total_timesteps=args.total_timesteps,
+            rng=self.rng,
+            args=args
         )
 
     def add_to_replay_buffer(self, n: int, verbose: bool = False):
         """
-        Takes n steps with the agent, adding to the replay buffer (and logging any results). Should return a dict of
-        data from the last terminated episode, if any.
+        Takes n steps with the agent, adding to the replay buffer (and logging any results). 
+        Should return a dict of data from the last terminated episode, if any.
 
-        Optional argument `verbose`: if True, we can use a progress bar (useful to check how long the initial buffer
-        filling is taking).
+        Optional argument `verbose`: if True, we can use a progress bar (useful to check how long 
+        the initial buffer filling is taking).
         """
-        for _ in range(n):
+        data = None
+
+        for _ in tqdm(range(n), disable=not verbose, desc="Filling replay buffer"):
             infos = self.agent.play_step()
+            data = data or get_episode_data_from_infos(infos)
+
+        return data
 
     def prepopulate_replay_buffer(self):
         """
@@ -249,27 +265,34 @@ class DQNTrainer:
 
     def training_step(self, step: int) -> Float[Tensor, ""]:
         """
-        Samples once from the replay buffer, and takes a single training step. The `step` argument is used to track the
-        number of training steps taken.
+        Samples once from the replay buffer, and takes a single training step. The `step` argument 
+        is used to track the number of training steps taken.
         """
-        batch = self.buffer.sample(self.args.batch_size, device)
+        batch = self.buffer.sample(self.args.batch_size, self.args.device)
 
-        # self.target.network(batch.next_obs).argmax[-1]
-
-        with t.inference_mode():
+        with torch.inference_mode():
             target_max = self.target_network(batch.next_obs).max(-1).values
 
         predicted_q_values = self.q_network(batch.obs)[range(len(batch.actions)), batch.actions]
 
-        td_loss = batch.rewards + self.args.gamma * (1 - batch.terminated.float()) * target_max - predicted_q_values
+        td_error = batch.rewards + self.args.gamma * (1 - batch.terminated.float()) * target_max - predicted_q_values
 
-        loss = td_loss.pow(2).mean()
+        loss = td_error.pow(2).mean()
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
 
         if step % self.args.trains_per_target_update == 0:
             self.target_network.load_state_dict(self.q_network.state_dict())
+
+        if self.args.use_wandb:
+            wandb.log({
+                "td_loss": loss,
+                "q_values": predicted_q_values.mean().item(),
+                "epsilon": self.agent.epsilon
+                },
+                step=self.agent.step,
+            )
 
 
     def train(self) -> None:
@@ -302,5 +325,7 @@ class DQNTrainer:
 if __name__ == "__main__":
     net= QNetwork(obs_shape=(4,), num_actions=2)
     print(f"Number of parameters in the current QNetwork is {sum(param.nelement() for param in net.parameters())}")
-
+    args = DQNArgs(total_timesteps=400_000)  # changing total_timesteps will also change ???
+    trainer = DQNTrainer(args)
+    trainer.train()
     

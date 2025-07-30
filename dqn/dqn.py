@@ -1,6 +1,6 @@
 import time
 import torch
-import wandb
+import trackio as wandb
 import numpy as np
 import gymnasium as gym
 from dataclasses import dataclass
@@ -23,7 +23,7 @@ class DQNArgs:
     num_envs: int = 1
 
     # Wandb / logging
-    use_wandb: bool = False
+    use_wandb: bool = True
     wandb_project_name: str = "DQNCartPole"
     wandb_entity: str | None = None
     video_log_freq: int | None = 50
@@ -287,11 +287,11 @@ class DQNTrainer:
 
         if self.args.use_wandb:
             wandb.log({
-                "td_loss": loss,
+                "td_loss": loss.item(),
                 "q_values": predicted_q_values.mean().item(),
-                "epsilon": self.agent.epsilon
+                "epsilon": self.agent.epsilon,
+                "agent_step": self.agent.step,
                 },
-                step=self.agent.step,
             )
 
 
@@ -299,11 +299,11 @@ class DQNTrainer:
         if self.args.use_wandb:
             wandb.init(
                 project=self.args.wandb_project_name,
-                entity=self.args.wandb_entity,
+                # entity=self.args.wandb_entity,
                 name=self.run_name,
-                monitor_gym=self.args.video_log_freq is not None,
+                # monitor_gym=self.args.video_log_freq is not None,
             )
-            wandb.watch(self.q_network, log="all", log_freq=50)
+            # wandb.watch(self.q_network, log="all", log_freq=50)
 
         self.prepopulate_replay_buffer()
 
@@ -315,6 +315,7 @@ class DQNTrainer:
             if data is not None and time.time() - last_logged_time > 0.5:
                 last_logged_time = time.time()
                 pbar.set_postfix(**data)
+                wandb.log(data)
 
             self.training_step(step)
 
